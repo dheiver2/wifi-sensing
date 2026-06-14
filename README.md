@@ -1,5 +1,7 @@
 # WiFi Sensing — Análise de Sinais Wi-Fi
 
+🌐 **Página de apresentação:** https://dheiver2.github.io/wifi-sensing/
+
 Aplicação desktop em Python para **pesquisa e experimentação em sensoriamento
 sem fio**. Escaneia redes Wi-Fi, constrói séries temporais da variação dos
 sinais, aplica processamento de sinais e técnicas de IA para identificar
