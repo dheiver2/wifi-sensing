@@ -28,8 +28,10 @@ _ACTIVITIES = ["Ambiente vazio/estático", "Parado / sentado", "Movimento leve",
 class SensingState:
     """Métricas reais de sensoriamento ambiental em um instante."""
 
-    motion_index: float            # movimento (RSSI filtrado por Kalman+Hampel)
-    coherence: float               # fração de APs movendo-se juntos [0..1]
+    motion_index: float            # movimento via PCA multi-link (amplitude dBm)
+    coherence: float               # variância explicada pela 1ª componente [0..1]
+    svr: float                     # short-term averaged variance ratio (~1 = estático)
+    lvr: float                     # long-term averaged variance ratio
     calibrated: bool               # limiar adaptado a ambiente vazio?
     presence: bool                 # movimento acima do limiar
     activity: str                  # faixa de atividade
@@ -62,24 +64,35 @@ class HumanSensingEngine:
         self._buffer: Deque[float] = deque(maxlen=self._window)
         self._ap_hist: dict[str, Deque[float]] = {}
         self._motion_threshold = 1.5  # dBm de desvio ~ movimento perceptível
-        # Calibração de ambiente vazio (limiar adaptativo).
+        # Calibração de ambiente vazio (limiares adaptativos).
         self._calibrated = False
         self._calib_threshold = self._motion_threshold
+        self._svr_threshold = 1.25
+        self._baseline_cv = 1e-3
         self._calib_buffer: list[float] = []
+        self._calib_svr: list[float] = []
+        self._calib_cv: list[float] = []
         self._calibrating = False
 
     def start_calibration(self) -> None:
         """Inicia a coleta da linha de base do ambiente vazio."""
         self._calibrating = True
         self._calib_buffer = []
+        self._calib_svr = []
+        self._calib_cv = []
 
     def finish_calibration(self) -> None:
-        """Conclui a calibração e define o limiar adaptativo de presença."""
+        """Conclui a calibração e define os limiares adaptativos (motion e SVR)."""
         self._calibrating = False
         if len(self._calib_buffer) >= 4:
             arr = np.array(self._calib_buffer)
-            # Limiar = média + 3σ do ruído do ambiente vazio (mín. 0.8 dBm).
+            # Limiar = média + 3σ do ruído do ambiente vazio (regra clássica 3σ).
             self._calib_threshold = max(0.8, float(arr.mean() + 3 * arr.std()))
+            if self._calib_svr:
+                s = np.array(self._calib_svr)
+                self._svr_threshold = max(1.15, float(s.mean() + 3 * s.std()))
+            if self._calib_cv:
+                self._baseline_cv = max(1e-3, float(np.mean(self._calib_cv)))
             self._calibrated = True
 
     def update(self, anchor_rssi: float, samples: Sequence[WifiSample]) -> SensingState:
@@ -100,21 +113,31 @@ class HumanSensingEngine:
         # --- Movimento (sinal filtrado) e fusão multi-AP ---
         recent = arr[-8:]
         motion_anchor = float(np.std(recent)) if recent.size >= 3 else 0.0
-        motion_fused, coherence = self._fuse_multi_ap(samples, motion_anchor)
-        motion = motion_fused
-
-        threshold = self._calib_threshold if self._calibrated else self._motion_threshold
-        present = motion > threshold
+        self._track_aps(samples)
+        # PCA multi-link: amplitude da componente de movimento correlacionada.
+        motion_pca, coherence = self._pca_motion(window=8)
+        motion = motion_pca if motion_pca > 0 else motion_anchor
+        # SVR/LVR (razões de coeficiente de variação) — detecção calibration-free.
+        svr = self._svr(short=6)
+        lvr = self._lvr(short=6)
 
         if self._calibrating:
             self._calib_buffer.append(motion)
+            self._calib_svr.append(svr)
+            self._calib_cv.append(self._mean_cv(6))
+
+        m_thr = self._calib_threshold if self._calibrated else self._motion_threshold
+        s_thr = self._svr_threshold
+        # Decisão: amplitude da componente PCA acima do limiar E coerência alta
+        # (muitos APs juntos), o que rejeita ruído de um único enlace.
+        present = motion > m_thr and coherence > 0.3
 
         jerk = float(abs(arr[-1] - arr[-2])) if arr.size >= 2 else 0.0
         event = jerk > 6.0
 
         if not present:
             activity = _ACTIVITIES[1] if arr.size > 4 else _ACTIVITIES[0]
-        elif jerk > 6 or motion > 2 * threshold:
+        elif jerk > 6 or motion > 2 * m_thr or svr > 1.8 * s_thr:
             activity = _ACTIVITIES[3]
         else:
             activity = _ACTIVITIES[2]
@@ -137,6 +160,8 @@ class HumanSensingEngine:
         return SensingState(
             motion_index=motion,
             coherence=coherence,
+            svr=svr,
+            lvr=lvr,
             calibrated=self._calibrated,
             presence=present,
             activity=activity,
@@ -154,41 +179,77 @@ class HumanSensingEngine:
             busiest_channel=busiest,
         )
 
-    def _fuse_multi_ap(self, samples, motion_anchor: float) -> tuple[float, float]:
-        """Funde a variação de múltiplos APs em um índice de movimento robusto.
-
-        Mantém uma curta janela de RSSI por AP. O movimento do ambiente é a
-        mediana dos desvios por AP (robusta a ruído de um único AP). A coerência
-        é a fração de APs ativos que variaram juntos no último instante — alta
-        coerência indica um evento físico global (alguém andando) e não ruído
-        local de um único ponto de acesso.
-
-        Returns:
-            (movimento_fundido, coerência) — coerência em [0, 1].
-        """
+    def _track_aps(self, samples) -> None:
+        """Atualiza o histórico curto de RSSI por AP (para fusão multi-link)."""
         for s in samples:
-            hist = self._ap_hist.setdefault(s.bssid, deque(maxlen=10))
-            hist.append(float(s.rssi))
-        # Remove APs que sumiram (mantém só os vistos recentemente).
+            self._ap_hist.setdefault(s.bssid, deque(maxlen=12)).append(float(s.rssi))
         seen = {s.bssid for s in samples}
         for b in [b for b in self._ap_hist if b not in seen]:
             if len(self._ap_hist[b]) <= 1:
                 self._ap_hist.pop(b, None)
 
-        stds, deltas = [], []
-        for hist in self._ap_hist.values():
-            if len(hist) >= 4:
-                a = np.array(hist, dtype=float)
-                stds.append(float(np.std(a[-6:])))
-                deltas.append(float(a[-1] - a[-2]))
-        if len(stds) < 3:
-            return motion_anchor, 0.0
+    def _link_matrix(self, window: int) -> np.ndarray | None:
+        """Matriz (links × janela) dos APs com histórico suficiente."""
+        rows = [list(h)[-window:] for h in self._ap_hist.values() if len(h) >= window]
+        return np.array(rows, dtype=float) if len(rows) >= 3 else None
 
-        motion = float(np.median(stds))
-        deltas_arr = np.array(deltas)
-        movers = np.abs(deltas_arr) > 1.0
-        coherence = float(np.mean(movers)) if deltas_arr.size else 0.0
-        return motion, coherence
+    def _pca_motion(self, window: int = 8) -> tuple[float, float]:
+        """Extrai a componente de movimento via PCA sobre múltiplos links.
+
+        Baseado em PCA-Kalman (Zhou et al., 2018): o movimento humano induz
+        variação *correlacionada* entre os enlaces, que se concentra na primeira
+        componente principal, enquanto o ruído de multipath se espalha pelas
+        demais. Retorna a amplitude (raiz do maior autovalor) e a variância
+        explicada pela 1ª componente (coerência).
+        """
+        M = self._link_matrix(window)
+        if M is None:
+            return 0.0, 0.0
+        Xc = M - M.mean(axis=1, keepdims=True)   # centra cada link no tempo
+        # Covariância entre links (linhas = links = variáveis; colunas = tempo).
+        cov = np.cov(Xc)
+        if np.ndim(cov) < 2 or cov.shape[0] < 2:
+            return 0.0, 0.0
+        vals, vecs = np.linalg.eigh(cov)
+        top = float(max(vals[-1], 0.0))
+        amplitude = float(np.sqrt(top))
+        # Coerência = espalhamento da 1ª componente entre links (participation
+        # ratio normalizado): ~1 se muitos APs contribuem (evento físico global),
+        # ~0 se a variação vem de um único AP (ruído local) — robustez multi-link.
+        w = vecs[:, -1] ** 2
+        pr = 1.0 / float(np.sum(w ** 2) + 1e-12)   # 1..n_links
+        n = len(w)
+        coherence = (pr - 1.0) / (n - 1.0) if n > 1 else 0.0
+        return amplitude, float(np.clip(coherence, 0.0, 1.0))
+
+    def _mean_cv(self, window: int) -> float:
+        """Coeficiente de variação médio entre links na janela recente."""
+        cvs = []
+        for h in self._ap_hist.values():
+            if len(h) >= window:
+                a = np.array(list(h)[-window:], dtype=float)
+                cvs.append(float(np.std(a) / (abs(np.mean(a)) + 1e-6)))
+        return float(np.mean(cvs)) if cvs else 0.0
+
+    def _svr(self, short: int = 6) -> float:
+        """Short-term Averaged Variance Ratio (Gong et al., 2015).
+
+        Razão do CV da janela curta atual pela janela curta anterior, média entre
+        links. ~1.0 em ambiente estático; cresce no início do movimento.
+        """
+        ratios = []
+        for h in self._ap_hist.values():
+            if len(h) >= 2 * short:
+                a = np.array(list(h), dtype=float)
+                cur, prev = a[-short:], a[-2 * short:-short]
+                cv_cur = np.std(cur) / (abs(np.mean(cur)) + 1e-6)
+                cv_prev = np.std(prev) / (abs(np.mean(prev)) + 1e-6)
+                ratios.append(cv_cur / (cv_prev + 1e-6))
+        return float(np.mean(ratios)) if ratios else 1.0
+
+    def _lvr(self, short: int = 6) -> float:
+        """Long-term Averaged Variance Ratio: CV atual vs linha de base vazia."""
+        return float(self._mean_cv(short) / (self._baseline_cv + 1e-6))
 
     def _periodicity(self, arr: np.ndarray) -> tuple[float, bool]:
         """Detecta periodicidade dominante na série de RSSI (FFT)."""

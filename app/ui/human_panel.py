@@ -154,7 +154,7 @@ class HumanSensingPanel(QWidget):
         grid = QGridLayout()
         root.addLayout(grid)
 
-        self.p_motion = _TimePanel("1. Movimento (σ do RSSI)", "dBm", _ORANGE, (0, 12))
+        self.p_motion = _TimePanel("1. Movimento (PCA multi-link)", "dBm", _ORANGE, (0, 12))
         self.p_activity = _StatePanel("2. Presença / Atividade")
         self.p_event = _TimePanel("3. Eventos bruscos (passagem/porta)", "dBm", _ORANGE, (0, 15))
         self.p_rhythm = _TimePanel("4. Periodicidade (movimento rítmico)", "s", _BLUE)
@@ -176,7 +176,7 @@ class HumanSensingPanel(QWidget):
         self.p_motion.push(
             st.motion_index,
             f"{st.motion_index:.1f} dBm  {'● movimento' if st.presence else '○ estático'}"
-            f"  · coerência {st.coherence * 100:.0f}%",
+            f"  · coer. {st.coherence * 100:.0f}%  · SVR {st.svr:.2f}  · LVR {st.lvr:.1f}",
         )
         self.lbl_calib.setText("limiar: calibrado ✓" if st.calibrated else "limiar: fixo")
         color = {

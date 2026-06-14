@@ -145,6 +145,32 @@ clf = EnvironmentClassifier.load(MODELS_DIR / "ambiente.joblib")
 print(clf.predict(X[:5]))
 ```
 
+## Métodos e referências
+
+A detecção de movimento/presença implementa técnicas consolidadas de
+sensoriamento Wi-Fi *device-free* (sem dispositivo no corpo), aplicadas ao RSSI
+de múltiplos APs:
+
+- **Filtragem Hampel + Kalman** do RSSI — remove outliers (spikes) e suaviza o
+  nível do sinal com baixo atraso (melhor que média móvel).
+- **Fusão multi-link por PCA** — o movimento humano induz variação
+  *correlacionada* entre enlaces, que se concentra na 1ª componente principal,
+  enquanto o ruído de multipath se espalha. A amplitude (√maior autovalor) mede
+  o movimento; a **coerência** (participation ratio do autovetor) distingue um
+  evento físico global (muitos APs juntos) de ruído de um único AP.
+  Baseado em *PCA-Kalman* (Zhou et al., 2018).
+- **SVR / LVR** (Short/Long-term Averaged Variance Ratio) — razões do
+  coeficiente de variação do RSSI (janela curta vs. anterior / vs. linha de
+  base), detecção robusta e *calibration-free*. Baseado em Gong et al. (2015).
+- **Calibração de ambiente vazio** — limiares adaptativos (regra 3σ) medidos no
+  local, em vez de limiar fixo.
+
+Referências:
+- Zhou et al., *PCA-Kalman: device-free indoor human behavior detection with
+  commodity Wi-Fi*, EURASIP J. Wireless Comm. Netw., 2018.
+- Gong et al., *WiFi-Based Real-Time Calibration-Free Passive Human Motion
+  Detection*, Sensors, 2015 (PMC4721815).
+
 ## Boas práticas adotadas
 
 Código orientado a objetos, type hints, docstrings, logging estruturado,
