@@ -63,13 +63,15 @@
 
   .shot{width:100%;border:1px solid var(--border);border-radius:14px;display:block;
     background:var(--surface)}
-  .photo{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--border)}
-  .photo img{width:100%;height:188px;object-fit:cover;display:block}
-  .photo .badge{position:absolute;top:12px;right:12px;font-size:12px;font-weight:700;
-    padding:6px 11px;border-radius:999px;backdrop-filter:blur(4px)}
-  .badge.green{background:rgba(22,56,42,.85);color:var(--green)}
-  .badge.red{background:rgba(90,31,31,.85);color:var(--red)}
-  .badge.blue{background:rgba(21,50,77,.85);color:var(--blue)}
+  .face-wrap{display:flex;flex-direction:column;align-items:center;gap:14px;padding:6px 0 4px}
+  .face{width:136px;height:136px;border-radius:50%;object-fit:cover;
+    border:3px solid var(--border);box-shadow:0 6px 22px rgba(0,0,0,.35)}
+  .face.green{border-color:var(--green)} .face.red{border-color:var(--red)}
+  .face.blue{border-color:var(--blue)}
+  .badge{font-size:12px;font-weight:700;padding:6px 13px;border-radius:999px}
+  .badge.green{background:rgba(22,56,42,.9);color:var(--green)}
+  .badge.red{background:rgba(90,31,31,.9);color:var(--red)}
+  .badge.blue{background:rgba(21,50,77,.9);color:var(--blue)}
   figure{margin:0}
   figcaption{color:var(--muted);font-size:14px;margin-top:10px;text-align:center}
 
@@ -348,8 +350,8 @@
 
     <!-- Persona 1: cuidado de idosos -->
     <div class="card">
-      <div class="photo">
-        <img src="img/persona-idosa.jpg" alt="Idosa usando o computador em casa" loading="lazy">
+      <div class="face-wrap">
+        <img class="face green" src="img/face-idosa.jpg" alt="Idosa — retrato frontal" loading="lazy">
         <span class="badge green">● movimento</span>
       </div>
       <div class="ico" style="margin-top:16px">👵</div>
@@ -360,8 +362,8 @@
 
     <!-- Persona 2: segurança / comércio -->
     <div class="card">
-      <div class="photo">
-        <img src="img/persona-seguranca.jpg" alt="Operador em sala de monitoramento" loading="lazy">
+      <div class="face-wrap">
+        <img class="face red" src="img/face-seguranca.jpg" alt="Operador — retrato frontal" loading="lazy">
         <span class="badge red">⚠ presença!</span>
       </div>
       <div class="ico" style="margin-top:16px">🛡️</div>
@@ -372,8 +374,8 @@
 
     <!-- Persona 3: escritório / automação -->
     <div class="card">
-      <div class="photo">
-        <img src="img/persona-facilities.jpg" alt="Profissional com headset usando o computador" loading="lazy">
+      <div class="face-wrap">
+        <img class="face blue" src="img/face-facilities.jpg" alt="Profissional — retrato frontal" loading="lazy">
         <span class="badge blue">ocupação detectada</span>
       </div>
       <div class="ico" style="margin-top:16px">🏢</div>
