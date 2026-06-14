@@ -63,6 +63,13 @@
 
   .shot{width:100%;border:1px solid var(--border);border-radius:14px;display:block;
     background:var(--surface)}
+  .photo{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--border)}
+  .photo img{width:100%;height:188px;object-fit:cover;display:block}
+  .photo .badge{position:absolute;top:12px;right:12px;font-size:12px;font-weight:700;
+    padding:6px 11px;border-radius:999px;backdrop-filter:blur(4px)}
+  .badge.green{background:rgba(22,56,42,.85);color:var(--green)}
+  .badge.red{background:rgba(90,31,31,.85);color:var(--red)}
+  .badge.blue{background:rgba(21,50,77,.85);color:var(--blue)}
   figure{margin:0}
   figcaption{color:var(--muted);font-size:14px;margin-top:10px;text-align:center}
 
@@ -341,31 +348,10 @@
 
     <!-- Persona 1: cuidado de idosos -->
     <div class="card">
-      <svg class="shot" viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Idosa usando o software no laptop">
-        <rect width="320" height="180" rx="12" fill="#12161c"/>
-        <rect x="10" y="150" width="300" height="8" fill="#1f242c"/>
-        <!-- laptop with app on screen -->
-        <rect x="34" y="74" width="108" height="64" rx="5" fill="#0f1216" stroke="#2b313b"/>
-        <rect x="40" y="80" width="96" height="52" rx="2" fill="#181c22"/>
-        <rect x="46" y="86" width="30" height="6" rx="2" fill="#E94A12"/>
-        <polyline points="46,124 60,116 74,120 88,102 102,108 116,90 130,96" fill="none" stroke="#E94A12" stroke-width="2"/>
-        <polyline points="46,128 60,126 74,122 88,124 102,118 116,120 130,114" fill="none" stroke="#4aa3ff" stroke-width="1.5"/>
-        <polygon points="26,138 150,138 162,150 14,150" fill="#2b313b"/>
-        <g stroke="#E94A12" fill="none" stroke-width="2" opacity=".7"><path d="M150 70 a16 16 0 0 1 22 0"/></g>
-        <!-- elderly woman with face -->
-        <g>
-          <rect x="210" y="106" width="64" height="46" rx="22" fill="#5a6172"/>
-          <circle cx="244" cy="72" r="23" fill="#e8b89a"/>
-          <path d="M221 72 a23 23 0 0 1 46 0 q-23 -17 -46 0" fill="#cfd2d7"/>
-          <circle cx="236" cy="72" r="5.5" fill="none" stroke="#3a3f49" stroke-width="1.6"/>
-          <circle cx="253" cy="72" r="5.5" fill="none" stroke="#3a3f49" stroke-width="1.6"/>
-          <line x1="241.5" y1="72" x2="247.5" y2="72" stroke="#3a3f49" stroke-width="1.4"/>
-          <circle cx="236" cy="72" r="1.7" fill="#2b313b"/><circle cx="253" cy="72" r="1.7" fill="#2b313b"/>
-          <path d="M237 84 q7 6 14 0" fill="none" stroke="#a86b54" stroke-width="2" stroke-linecap="round"/>
-        </g>
-        <g><rect x="222" y="18" width="84" height="22" rx="11" fill="#16382a"/>
-          <text x="264" y="33" fill="#2ecc71" font-family="sans-serif" font-size="11" text-anchor="middle" font-weight="700">● movimento</text></g>
-      </svg>
+      <div class="photo">
+        <img src="img/persona-idosa.jpg" alt="Idosa usando o computador em casa" loading="lazy">
+        <span class="badge green">● movimento</span>
+      </div>
       <div class="ico" style="margin-top:16px">👵</div>
       <h3>Dona Marta, 78 — mora sozinha</h3>
       <p>A família é avisada se não houver movimento na cozinha pela manhã, ou se um
@@ -374,29 +360,10 @@
 
     <!-- Persona 2: segurança / comércio -->
     <div class="card">
-      <svg class="shot" viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Segurança usando o software">
-        <rect width="320" height="180" rx="12" fill="#12161c"/>
-        <rect x="10" y="150" width="300" height="8" fill="#1f242c"/>
-        <!-- security guard with face, left -->
-        <g>
-          <rect x="44" y="106" width="64" height="46" rx="22" fill="#22304a"/>
-          <rect x="58" y="116" width="36" height="14" rx="3" fill="#15203a"/>
-          <circle cx="76" cy="72" r="23" fill="#cf9f78"/>
-          <path d="M53 70 a23 23 0 0 1 46 0 l0 -3 q-23 -14 -46 0 z" fill="#2f2a26"/>
-          <rect x="53" y="58" width="46" height="9" rx="3" fill="#15203a"/>
-          <circle cx="68" cy="74" r="2" fill="#2b313b"/><circle cx="85" cy="74" r="2" fill="#2b313b"/>
-          <path d="M70 86 q6 4 12 0" fill="none" stroke="#9a6a4a" stroke-width="2" stroke-linecap="round"/>
-        </g>
-        <!-- laptop with alert -->
-        <rect x="176" y="74" width="108" height="64" rx="5" fill="#0f1216" stroke="#2b313b"/>
-        <rect x="182" y="80" width="96" height="52" rx="2" fill="#181c22"/>
-        <rect x="188" y="86" width="84" height="16" rx="3" fill="#5a1f1f"/>
-        <text x="230" y="98" fill="#ff5d5d" font-family="sans-serif" font-size="10" text-anchor="middle" font-weight="700">⚠ PRESENÇA</text>
-        <polyline points="188,124 204,118 220,122 236,104 252,112 268,98" fill="none" stroke="#ff5d5d" stroke-width="2"/>
-        <polygon points="168,138 292,138 304,150 156,150" fill="#2b313b"/>
-        <g><rect x="14" y="18" width="86" height="22" rx="11" fill="#5a1f1f"/>
-          <text x="57" y="33" fill="#ff5d5d" font-family="sans-serif" font-size="11" text-anchor="middle" font-weight="700">⚠ alerta!</text></g>
-      </svg>
+      <div class="photo">
+        <img src="img/persona-seguranca.jpg" alt="Operador em sala de monitoramento" loading="lazy">
+        <span class="badge red">⚠ presença!</span>
+      </div>
       <div class="ico" style="margin-top:16px">🛡️</div>
       <h3>Carlos — loja fechada à noite</h3>
       <p>Fora do horário, qualquer movimento dispara um alerta no celular. Detecta
@@ -405,31 +372,10 @@
 
     <!-- Persona 3: escritório / automação -->
     <div class="card">
-      <svg class="shot" viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Facilities usando o software">
-        <rect width="320" height="180" rx="12" fill="#12161c"/>
-        <rect x="10" y="150" width="300" height="8" fill="#1f242c"/>
-        <!-- laptop with occupancy bars -->
-        <rect x="34" y="74" width="108" height="64" rx="5" fill="#0f1216" stroke="#2b313b"/>
-        <rect x="40" y="80" width="96" height="52" rx="2" fill="#181c22"/>
-        <rect x="48" y="112" width="14" height="14" fill="#E94A12"/><rect x="70" y="100" width="14" height="26" fill="#4aa3ff"/>
-        <rect x="92" y="120" width="14" height="6" fill="#2ecc71"/><rect x="114" y="106" width="14" height="20" fill="#4aa3ff"/>
-        <rect x="48" y="86" width="40" height="6" rx="2" fill="#4aa3ff"/>
-        <polygon points="26,138 150,138 162,150 14,150" fill="#2b313b"/>
-        <!-- facilities worker with face -->
-        <g>
-          <rect x="210" y="106" width="64" height="46" rx="22" fill="#2f6f53"/>
-          <circle cx="244" cy="72" r="23" fill="#8d5a3c"/>
-          <path d="M221 71 a23 23 0 0 1 46 0 l0 -2 q-23 -15 -46 0 z" fill="#241a14"/>
-          <circle cx="236" cy="73" r="2" fill="#1d130d"/><circle cx="253" cy="73" r="2" fill="#1d130d"/>
-          <path d="M237 84 q7 5 14 0" fill="none" stroke="#5e3a26" stroke-width="2" stroke-linecap="round"/>
-          <!-- headset -->
-          <path d="M221 70 a23 23 0 0 1 46 0" fill="none" stroke="#1f242c" stroke-width="3"/>
-          <rect x="217" y="68" width="6" height="12" rx="3" fill="#1f242c"/>
-          <line x1="223" y1="80" x2="234" y2="86" stroke="#1f242c" stroke-width="2"/>
-        </g>
-        <g><rect x="216" y="18" width="90" height="22" rx="11" fill="#15324d"/>
-          <text x="261" y="33" fill="#4aa3ff" font-family="sans-serif" font-size="11" text-anchor="middle" font-weight="700">2 ocupando</text></g>
-      </svg>
+      <div class="photo">
+        <img src="img/persona-facilities.jpg" alt="Profissional com headset usando o computador" loading="lazy">
+        <span class="badge blue">ocupação detectada</span>
+      </div>
       <div class="ico" style="margin-top:16px">🏢</div>
       <h3>Equipe de facilities</h3>
       <p>Salas de reunião ligam luz e ar-condicionado só quando há ocupação real,
@@ -438,7 +384,9 @@
 
   </div>
   <p class="muted" style="font-size:13px;margin-top:18px">* Personas e cenários
-    ilustrativos para fins de demonstração.</p>
+    ilustrativos. As fotos são imagens genéricas de banco livre
+    (<a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a>,
+    licença livre) e não retratam usuários reais do produto.</p>
 </div></div>
 
 <div class="sep"></div>
