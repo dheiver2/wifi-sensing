@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Build / empacotamento (py2app)
+build/
+dist/
+.eggs/
+
+# macOS
+.DS_Store
+
+# Dados gerados
+data/
+*.db
+*.csv
+*.joblib
+*.log
+
+# BitNet (bitnet.cpp): código de terceiros, binários e modelo (~1,1 GB)
+bitnet/
+*.gguf
