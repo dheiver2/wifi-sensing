@@ -19,6 +19,7 @@ DATA_FILES: list = []
 
 OPTIONS = {
     "argv_emulation": False,
+    "iconfile": "icon.icns",
     "packages": ["app"],
     "includes": ["CoreWLAN", "CoreLocation"],
     "plist": {
