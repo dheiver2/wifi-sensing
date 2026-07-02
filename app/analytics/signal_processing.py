@@ -6,11 +6,37 @@ de características utilizadas pelos modelos de IA.
 
 from __future__ import annotations
 
-from typing import Dict
-
 import numpy as np
 from scipy import signal as sp_signal
 from scipy import stats
+
+
+def sanitize_series(series: np.ndarray) -> np.ndarray:
+    """Converte para vetor 1D de float e neutraliza valores não-finitos.
+
+    Garantia de robustez para todo o pipeline: ``NaN``/``inf`` (comuns quando o
+    scanner perde uma leitura) são interpolados a partir dos vizinhos finitos;
+    se não houver nenhum valor finito, retorna zeros. Isso evita que um único
+    valor inválido contamine médias, FFTs e covariâncias rio abaixo.
+
+    Args:
+        series: Sequência de valores (qualquer dtype convertível para float).
+
+    Returns:
+        Vetor 1D ``float`` finito, com o mesmo comprimento da entrada.
+    """
+    arr = np.asarray(series, dtype=float).ravel()
+    if arr.size == 0:
+        return arr
+    finite = np.isfinite(arr)
+    if finite.all():
+        return arr
+    if not finite.any():
+        return np.zeros_like(arr)
+    idx = np.arange(arr.size)
+    arr = arr.copy()
+    arr[~finite] = np.interp(idx[~finite], idx[finite], arr[finite])
+    return arr
 
 
 def moving_average(series: np.ndarray, window: int = 5) -> np.ndarray:
@@ -23,7 +49,7 @@ def moving_average(series: np.ndarray, window: int = 5) -> np.ndarray:
     Returns:
         Série suavizada com o mesmo comprimento da entrada.
     """
-    series = np.asarray(series, dtype=float)
+    series = sanitize_series(series)
     if window <= 1 or series.size < window:
         return series
     kernel = np.ones(window) / window
@@ -45,7 +71,7 @@ def hampel_filter(series: np.ndarray, window: int = 7, n_sigmas: float = 3.0) ->
     Returns:
         Série com outliers corrigidos (mesmo comprimento).
     """
-    series = np.asarray(series, dtype=float)
+    series = sanitize_series(series)
     n = series.size
     if n < 3:
         return series.copy()
@@ -57,7 +83,10 @@ def hampel_filter(series: np.ndarray, window: int = 7, n_sigmas: float = 3.0) ->
         local = series[lo:hi]
         med = np.median(local)
         mad = k * np.median(np.abs(local - med))
-        if mad > 0 and abs(series[i] - med) > n_sigmas * mad:
+        # Com MAD>0, regra clássica n-sigmas; com vizinhança constante (MAD=0),
+        # qualquer divergência da mediana é um spike.
+        is_outlier = abs(series[i] - med) > n_sigmas * mad if mad > 0 else series[i] != med
+        if is_outlier:
             out[i] = med
     return out
 
@@ -77,7 +106,7 @@ def kalman_smooth(series: np.ndarray, q: float = 0.05, r: float = 4.0) -> np.nda
     Returns:
         Série filtrada (mesmo comprimento).
     """
-    series = np.asarray(series, dtype=float)
+    series = sanitize_series(series)
     if series.size == 0:
         return series
     x = series[0]      # estimativa de estado
@@ -105,7 +134,7 @@ def denoise(series: np.ndarray, window: int = 7, polyorder: int = 2) -> np.ndarr
     Returns:
         Série filtrada.
     """
-    series = np.asarray(series, dtype=float)
+    series = sanitize_series(series)
     if series.size < 5:
         return series
     win = min(window, series.size)
@@ -119,29 +148,43 @@ def denoise(series: np.ndarray, window: int = 7, polyorder: int = 2) -> np.ndarr
     return sp_signal.savgol_filter(series, win, polyorder)
 
 
-def compute_fft(series: np.ndarray, sample_rate: float = 1.0) -> tuple[np.ndarray, np.ndarray]:
+def compute_fft(
+    series: np.ndarray, sample_rate: float = 1.0, window: bool = True
+) -> tuple[np.ndarray, np.ndarray]:
     """Calcula a Transformada Rápida de Fourier (espectro de magnitude).
+
+    Aplica remoção de DC e, por padrão, uma janela de Hann antes da FFT para
+    reduzir o vazamento espectral (*spectral leakage*) — essencial quando a
+    série é curta e o sinal periódico não completa um número inteiro de ciclos.
+    A magnitude é corrigida pelo ganho coerente da janela para manter a escala.
 
     Args:
         series: Vetor 1D de valores.
         sample_rate: Taxa de amostragem em Hz (1 / intervalo de varredura).
+        window: Se ``True`` (padrão), aplica janela de Hann.
 
     Returns:
         Tupla ``(frequências, magnitudes)`` contendo apenas o lado positivo.
     """
-    series = np.asarray(series, dtype=float)
+    series = sanitize_series(series)
     series = series - np.mean(series)
     n = series.size
     if n < 2:
         return np.array([]), np.array([])
+    if window:
+        w = np.hanning(n)
+        coherent_gain = float(np.mean(w)) or 1.0
+        series = series * w
+        mags = np.abs(np.fft.rfft(series)) / (n * coherent_gain)
+    else:
+        mags = np.abs(np.fft.rfft(series)) / n
     freqs = np.fft.rfftfreq(n, d=1.0 / sample_rate)
-    mags = np.abs(np.fft.rfft(series)) / n
     return freqs, mags
 
 
-def statistical_summary(series: np.ndarray) -> Dict[str, float]:
+def statistical_summary(series: np.ndarray) -> dict[str, float]:
     """Calcula estatísticas descritivas de uma série."""
-    series = np.asarray(series, dtype=float)
+    series = sanitize_series(series)
     if series.size == 0:
         return {k: 0.0 for k in ("mean", "std", "min", "max", "skew", "kurtosis", "rms")}
     return {
@@ -155,7 +198,7 @@ def statistical_summary(series: np.ndarray) -> Dict[str, float]:
     }
 
 
-def extract_features(series: np.ndarray, sample_rate: float = 1.0) -> Dict[str, float]:
+def extract_features(series: np.ndarray, sample_rate: float = 1.0) -> dict[str, float]:
     """Extrai um vetor de características de uma série temporal de RSSI.
 
     Combina estatísticas no domínio do tempo e da frequência, úteis para
@@ -164,7 +207,7 @@ def extract_features(series: np.ndarray, sample_rate: float = 1.0) -> Dict[str, 
     Returns:
         Dicionário ordenado de características.
     """
-    series = np.asarray(series, dtype=float)
+    series = sanitize_series(series)
     feats = statistical_summary(series)
 
     # Variação temporal.

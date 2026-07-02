@@ -37,7 +37,7 @@ def request_location_authorization(timeout_s: float = 8.0) -> bool:
         import time
 
         import CoreLocation
-        from Foundation import NSRunLoop, NSDate
+        from Foundation import NSDate, NSRunLoop
     except ImportError:
         logger.warning("CoreLocation indisponível; SSID/BSSID ficarão ocultos.")
         return False

@@ -1,21 +1,21 @@
 """Processamento de sinais e extração de características."""
 
 from app.analytics.signal_processing import (
-    moving_average,
+    compute_fft,
+    denoise,
+    extract_features,
     hampel_filter,
     kalman_smooth,
-    denoise,
-    compute_fft,
-    extract_features,
+    moving_average,
     statistical_summary,
 )
 
 __all__ = [
-    "moving_average",
+    "compute_fft",
+    "denoise",
+    "extract_features",
     "hampel_filter",
     "kalman_smooth",
-    "denoise",
-    "compute_fft",
-    "extract_features",
+    "moving_average",
     "statistical_summary",
 ]

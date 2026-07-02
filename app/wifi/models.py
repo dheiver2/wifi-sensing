@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
-from datetime import datetime, timezone
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -31,7 +31,7 @@ class WifiSample:
 
     def __post_init__(self) -> None:
         if self.timestamp is None:
-            self.timestamp = datetime.now(timezone.utc)
+            self.timestamp = datetime.now(UTC)
 
     def to_dict(self) -> dict[str, Any]:
         """Serializa a amostra em dicionário (timestamp em ISO 8601)."""

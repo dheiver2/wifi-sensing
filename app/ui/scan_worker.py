@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List
-
-from PySide6.QtCore import QObject, QThread, Signal, Slot
+from PySide6.QtCore import QObject, QThread, QTimer, Signal, Slot
 
 from app.utils.logging_config import get_logger
 from app.wifi.models import WifiSample
@@ -28,14 +26,12 @@ class ScanWorker(QObject):
         super().__init__()
         self._scanner = scanner
         self._interval_ms = int(interval_s * 1000)
-        self._timer: "QTimer | None" = None
+        self._timer: QTimer | None = None
         self._running = False
 
     @Slot()
     def start(self) -> None:
         """Inicia o laço de varredura (chamado dentro da thread)."""
-        from PySide6.QtCore import QTimer
-
         self._running = True
         self._timer = QTimer()
         self._timer.setInterval(self._interval_ms)
@@ -63,9 +59,9 @@ class ScanWorker(QObject):
         if not self._running:
             return
         try:
-            samples: List[WifiSample] = self._scanner.scan()
+            samples: list[WifiSample] = self._scanner.scan()
             self.samples_ready.emit(samples)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.exception("Falha na varredura.")
             self.error.emit(str(exc))
 

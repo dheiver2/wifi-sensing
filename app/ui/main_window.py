@@ -10,7 +10,6 @@ from __future__ import annotations
 from collections import Counter, defaultdict, deque
 from datetime import datetime
 from pathlib import Path
-from typing import Deque, Dict, List
 
 import numpy as np
 import pyqtgraph as pg
@@ -36,20 +35,20 @@ from PySide6.QtWidgets import (
 )
 
 from app.ai.bitnet import BitNetClient
-from app.ai.change_detection import ChangeDetector
+from app.ai.change_detection import ChangeDetector, ChangeResult
 from app.ai.human_sensing import HumanSensingEngine
-from app.ui.heatmap_panel import HeatmapPanel
-from app.ui.human_panel import HumanSensingPanel
 from app.analytics.signal_processing import moving_average
 from app.analytics.summary import build_summary
 from app.database.repository import MeasurementRepository
+from app.ui import theme
+from app.ui.heatmap_panel import HeatmapPanel
+from app.ui.human_panel import HumanSensingPanel
 from app.ui.llm_panel import LLMPanel
 from app.ui.scan_worker import ScanController
 from app.utils.config import AppConfig
 from app.utils.logging_config import get_logger
 from app.wifi.models import WifiSample
 from app.wifi.scanner import WifiScanner
-from app.ui import theme
 
 logger = get_logger(__name__)
 
@@ -98,12 +97,13 @@ class MainWindow(QMainWindow):
         self._repo = repository
         self._config = config
 
-        self._history: Dict[str, Deque[float]] = defaultdict(
+        self._history: dict[str, deque[float]] = defaultdict(
             lambda: deque(maxlen=config.history_points)
         )
-        self._curves: Dict[str, pg.PlotDataItem] = {}
-        self._ssid_by_bssid: Dict[str, str] = {}
-        self._last_samples: List[WifiSample] = []
+        self._curves: dict[str, pg.PlotDataItem] = {}
+        self._ssid_by_bssid: dict[str, str] = {}
+        self._last_samples: list[WifiSample] = []
+        self._last_change: ChangeResult | None = None
         self._top_n = 8
 
         self._detector = ChangeDetector(threshold=config.change_threshold)
@@ -202,12 +202,12 @@ class MainWindow(QMainWindow):
             ["SSID", "BSSID", "RSSI", "Canal", "Freq (MHz)", "Banda"]
         )
         self.table.horizontalHeader().setStretchLastSection(True)
-        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.setSortingEnabled(True)
         return self.table
 
     def _build_plots(self) -> QWidget:
-        splitter = QSplitter(Qt.Vertical)
+        splitter = QSplitter(Qt.Orientation.Vertical)
 
         # Série temporal de RSSI (apenas top-N para legibilidade).
         self.plot = pg.PlotWidget(title="Intensidade do sinal (RSSI) — redes mais fortes")
@@ -287,7 +287,7 @@ class MainWindow(QMainWindow):
             self._update_plot(self._last_samples)
 
     @Slot(list)
-    def _on_samples(self, samples: List[WifiSample]) -> None:
+    def _on_samples(self, samples: list[WifiSample]) -> None:
         if not samples:
             return
         self._last_samples = samples
@@ -306,7 +306,7 @@ class MainWindow(QMainWindow):
             f"Última coleta {datetime.now():%H:%M:%S}"
         )
 
-    def _update_kpis(self, samples: List[WifiSample]) -> None:
+    def _update_kpis(self, samples: list[WifiSample]) -> None:
         from collections import Counter
 
         self.kpi_nets.set(str(len(samples)))
@@ -342,18 +342,20 @@ class MainWindow(QMainWindow):
                 self, "Sem dados", "Inicie a coleta antes de interpretar."
             )
             return
-        change = self._detector.update(self._anchor_rssi(self._last_samples))
+        # Usa o último resultado já calculado na varredura; NÃO chama update()
+        # aqui para não injetar uma amostra duplicada no detector.
+        change_prob = self._last_change.probability if self._last_change else 0.0
         prompt = build_summary(
             self._last_samples,
             self._history,
-            change.probability,
+            change_prob,
             self._detector.stability_index(),
             self.combo_focus.currentText(),
         )
         self.llm_panel.generate(prompt)
 
     # -------------------------------------------------------------- Updates
-    def _update_table(self, samples: List[WifiSample]) -> None:
+    def _update_table(self, samples: list[WifiSample]) -> None:
         self.table.setSortingEnabled(False)
         ordered = sorted(samples, key=lambda s: s.rssi, reverse=True)
         self.table.setRowCount(len(ordered))
@@ -377,13 +379,13 @@ class MainWindow(QMainWindow):
             return QColor("#E9A412")
         return QColor("#d62728")
 
-    def _update_focus_combo(self, samples: List[WifiSample]) -> None:
+    def _update_focus_combo(self, samples: list[WifiSample]) -> None:
         for s in samples:
             if s.bssid not in self._ssid_by_bssid:
                 self._ssid_by_bssid[s.bssid] = s.ssid
                 self.combo_focus.addItem(f"{s.ssid} ({s.bssid})", s.bssid)
 
-    def _update_plot(self, samples: List[WifiSample]) -> None:
+    def _update_plot(self, samples: list[WifiSample]) -> None:
         for s in samples:
             self._history[s.bssid].append(float(s.rssi))
 
@@ -416,7 +418,7 @@ class MainWindow(QMainWindow):
                 )
             self._curves[bssid].setData(x, smoothed)
 
-    def _update_channel_plot(self, samples: List[WifiSample]) -> None:
+    def _update_channel_plot(self, samples: list[WifiSample]) -> None:
         counts = Counter(s.channel for s in samples)
         band_of = {s.channel: WifiSample.band(s.frequency_mhz) for s in samples}
         channels = sorted(counts)
@@ -435,7 +437,7 @@ class MainWindow(QMainWindow):
         ax = self.chan_plot.getAxis("bottom")
         ax.setTicks([[(i, str(c)) for i, c in enumerate(channels)]])
 
-    def _anchor_rssi(self, samples: List[WifiSample]) -> float:
+    def _anchor_rssi(self, samples: list[WifiSample]) -> float:
         """Valor de RSSI estável para alimentar a detecção de mudança.
 
         Com uma rede monitorada, usa o RSSI dela; caso contrário, usa a mediana
@@ -448,8 +450,9 @@ class MainWindow(QMainWindow):
                 return float(target.rssi)
         return float(np.median([s.rssi for s in samples]))
 
-    def _update_change_indicator(self, samples: List[WifiSample]) -> None:
+    def _update_change_indicator(self, samples: list[WifiSample]) -> None:
         result = self._detector.update(self._anchor_rssi(samples))
+        self._last_change = result
         pct = int(result.probability * 100)
         color = theme.RED if result.is_alert else theme.GREEN
         self.kpi_change.set(
@@ -460,7 +463,7 @@ class MainWindow(QMainWindow):
         self.kpi_stab.set(f"{stability * 100:.0f}%", color=scol)
 
     # ------------------------------------------------------------- Lifecycle
-    def closeEvent(self, event) -> None:  # noqa: N802 - override Qt
+    def closeEvent(self, event) -> None:
         self._controller.stop()
         for obj in (self._scanner, self._llm):
             close = getattr(obj, "close", None)

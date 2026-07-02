@@ -69,7 +69,7 @@ class BitNetClient:
         try:
             with urllib.request.urlopen(f"{self.base_url}/health", timeout=2) as r:
                 return r.status == 200
-        except Exception:  # noqa: BLE001
+        except Exception:
             return False
 
     def ensure_server(self) -> None:

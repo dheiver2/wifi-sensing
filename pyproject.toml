@@ -1,0 +1,40 @@
+[project]
+name = "wifi-sensing"
+version = "0.1.0"
+description = "Análise de sinais Wi-Fi com processamento de sinais, IA e sensoriamento ambiental."
+requires-python = ">=3.11"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = ["bitnet", ".venv", "build", "dist"]
+
+[tool.ruff.lint]
+# E/F: pyflakes+pycodestyle, I: isort, UP: pyupgrade, B: bugbear (pega bugs),
+# SIM: simplificações, RUF: regras do Ruff. Foco em capturar bugs reais.
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+# E501: linha tratada pelo formatter. RUF002/RUF003: caracteres "ambíguos"
+# (σ, ×, ≈) são notação científica intencional nas docstrings em português.
+ignore = ["E501", "RUF002", "RUF003"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["app"]
+exclude = "bitnet|build|dist|\\.venv"
+ignore_missing_imports = true   # libs sem stubs (PySide6, CoreWLAN, pyqtgraph)
+warn_unused_ignores = true
+warn_redundant_casts = true
+check_untyped_defs = true
+no_implicit_optional = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/ui/*", "app/main.py", "app/wifi/location.py"]
+
+[tool.coverage.report]
+exclude_lines = ["pragma: no cover", "if __name__ == .__main__.:"]

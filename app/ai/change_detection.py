@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
-from typing import Deque
 
 import numpy as np
 
@@ -44,6 +43,7 @@ class ChangeDetector:
         recent_window: int = 10,
         threshold: float = 0.7,
         sensitivity: float = 1.0,
+        stability_scale: float = 5.0,
     ) -> None:
         """Inicializa o detector.
 
@@ -57,7 +57,8 @@ class ChangeDetector:
         self.recent_window = recent_window
         self.threshold = threshold
         self.sensitivity = sensitivity
-        self._buffer: Deque[float] = deque(maxlen=baseline_window + recent_window)
+        self.stability_scale = stability_scale
+        self._buffer: deque[float] = deque(maxlen=baseline_window + recent_window)
 
     def reset(self) -> None:
         """Limpa o histórico acumulado."""
@@ -72,7 +73,12 @@ class ChangeDetector:
         Returns:
             :class:`ChangeResult` com a probabilidade e o estado de alerta.
         """
-        self._buffer.append(float(rssi))
+        value = float(rssi)
+        if not np.isfinite(value):
+            # Leitura inválida (scanner perdeu o AP): reaproveita a última
+            # amostra válida em vez de contaminar a estatística com NaN/inf.
+            value = self._buffer[-1] if self._buffer else 0.0
+        self._buffer.append(value)
 
         if len(self._buffer) < self.recent_window + 5:
             return ChangeResult(probability=0.0, is_alert=False, z_score=0.0)
@@ -81,11 +87,22 @@ class ChangeDetector:
         recent = data[-self.recent_window:]
         baseline = data[: -self.recent_window]
 
-        base_mean = float(np.mean(baseline))
-        base_std = float(np.std(baseline)) + 1e-6
-        recent_mean = float(np.mean(recent))
+        # Linha de base robusta: mediana + MAD (resistente a outliers, ao
+        # contrário de média/desvio, que são puxados por picos espúrios de RSSI).
+        base_med = float(np.median(baseline))
+        mad = float(np.median(np.abs(baseline - base_med)))
+        base_scale = 1.4826 * mad + 1e-6  # MAD reescalado ≈ desvio-padrão
+        recent_med = float(np.median(recent))
 
-        z = abs(recent_mean - base_mean) / base_std
+        # (1) Desvio de NÍVEL (deslocamento da mediana recente).
+        z_level = abs(recent_med - base_med) / base_scale
+        # (2) Desvio de DISPERSÃO (a variabilidade recente cresce quando há
+        # movimento, mesmo sem mudar o nível médio) — razão de espalhamento.
+        recent_scale = 1.4826 * float(np.median(np.abs(recent - recent_med)))
+        z_spread = max(0.0, (recent_scale - base_scale) / base_scale)
+
+        # Combina as duas evidências (norma euclidiana) num único z robusto.
+        z = float(np.hypot(z_level, z_spread))
         # Função logística centrada em z=2 (≈2 desvios -> ~0.5).
         probability = 1.0 / (1.0 + np.exp(-self.sensitivity * (z - 2.0)))
         return ChangeResult(
@@ -101,6 +118,9 @@ class ChangeDetector:
         """
         if len(self._buffer) < 5:
             return 1.0
-        std = float(np.std(np.array(self._buffer, dtype=float)))
-        # Mapeia desvio padrão para [0, 1] de forma decrescente.
-        return float(np.exp(-std / 5.0))
+        data = np.array(self._buffer, dtype=float)
+        # Dispersão robusta (MAD reescalado) — não colapsa por um único pico.
+        med = float(np.median(data))
+        scale = 1.4826 * float(np.median(np.abs(data - med)))
+        # Mapeia dispersão para [0, 1] de forma decrescente.
+        return float(np.exp(-scale / self.stability_scale))

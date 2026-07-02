@@ -11,7 +11,7 @@ from PySide6.QtWidgets import QApplication
 
 from app.database.repository import MeasurementRepository
 from app.ui.main_window import MainWindow
-from app.utils.config import AppConfig, LOG_DIR
+from app.utils.config import LOG_DIR, AppConfig
 from app.utils.logging_config import setup_logging
 from app.wifi.scanner import create_scanner
 

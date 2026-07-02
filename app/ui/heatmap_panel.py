@@ -15,7 +15,6 @@ reproduzível apenas com RSSI. Aqui o "espaço" é (rede × tempo), não (x × y
 from __future__ import annotations
 
 from collections import deque
-from typing import Deque, Dict, List
 
 import numpy as np
 import pyqtgraph as pg
@@ -42,7 +41,7 @@ class _HeatmapView(QWidget):
             f"{title} <span style='color:{theme.GREEN};font-weight:bold'>[REAL]</span>"
             f" <span style='color:{theme.MUTED}'>— {unit}</span>"
         )
-        header.setTextFormat(Qt.RichText)
+        header.setTextFormat(Qt.TextFormat.RichText)
         lay.addWidget(header)
 
         self.plot = pg.PlotWidget()
@@ -57,7 +56,7 @@ class _HeatmapView(QWidget):
         bar.setImageItem(self.img, insert_in=self.plot.getPlotItem())
         lay.addWidget(self.plot)
 
-    def set_matrix(self, mat: np.ndarray, ylabels: List[str]) -> None:
+    def set_matrix(self, mat: np.ndarray, ylabels: list[str]) -> None:
         self.img.setImage(mat, levels=self._levels, autoLevels=False)
         ticks = [(i + 0.5, name) for i, name in enumerate(ylabels)]
         self.plot.getAxis("left").setTicks([ticks])
@@ -76,11 +75,11 @@ class HeatmapPanel(QWidget):
             "do sinal). <i>Imagem espacial através de paredes (RF-Capture/MIT) "
             "exigiria radar e CSI — não reproduzível só com RSSI.</i>"
         )
-        note.setTextFormat(Qt.RichText)
+        note.setTextFormat(Qt.TextFormat.RichText)
         note.setWordWrap(True)
         root.addWidget(note)
 
-        splitter = QSplitter(Qt.Vertical)
+        splitter = QSplitter(Qt.Orientation.Vertical)
         self.hm_rssi = _HeatmapView(
             "Intensidade do sinal (RSSI) por rede", "inferno", (-95, -30), "dBm"
         )
@@ -92,10 +91,10 @@ class HeatmapPanel(QWidget):
         splitter.setSizes([360, 360])
         root.addWidget(splitter)
 
-        self._frames: Deque[Dict[str, float]] = deque(maxlen=_MAX_COLS)
-        self._ssid: Dict[str, str] = {}
+        self._frames: deque[dict[str, float]] = deque(maxlen=_MAX_COLS)
+        self._ssid: dict[str, str] = {}
 
-    def update_frame(self, samples: List[WifiSample]) -> None:
+    def update_frame(self, samples: list[WifiSample]) -> None:
         """Adiciona a varredura atual e redesenha os mapas de calor."""
         if not samples:
             return
@@ -104,7 +103,7 @@ class HeatmapPanel(QWidget):
         self._frames.append({s.bssid: float(s.rssi) for s in samples})
 
         # Linhas = redes mais fortes (média de RSSI ao longo do histórico).
-        means: Dict[str, list] = {}
+        means: dict[str, list] = {}
         for frame in self._frames:
             for b, r in frame.items():
                 means.setdefault(b, []).append(r)

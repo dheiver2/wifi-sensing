@@ -7,7 +7,6 @@ exigiriam CSI não são exibidas aqui propositalmente.
 from __future__ import annotations
 
 from collections import deque
-from typing import Deque
 
 import numpy as np
 import pyqtgraph as pg
@@ -35,7 +34,7 @@ def _header(title: str) -> QLabel:
     lbl = QLabel(
         f"{title} <span style='color:{_GREEN};font-weight:bold'>[REAL]</span>"
     )
-    lbl.setTextFormat(Qt.RichText)
+    lbl.setTextFormat(Qt.TextFormat.RichText)
     return lbl
 
 
@@ -61,7 +60,7 @@ class _TimePanel(QGroupBox):
             self.plot.setYRange(*y_range)
         self.curve = self.plot.plot(pen=pg.mkPen(color, width=2))
         layout.addWidget(self.plot)
-        self._buf: Deque[float] = deque(maxlen=_MAXLEN)
+        self._buf: deque[float] = deque(maxlen=_MAXLEN)
         self._unit = unit
 
     def push(self, value: float, label: str | None = None) -> None:
@@ -78,7 +77,7 @@ class _StatePanel(QGroupBox):
         layout = QVBoxLayout(self)
         layout.addWidget(_header(title))
         self.value_lbl = QLabel("—")
-        self.value_lbl.setAlignment(Qt.AlignCenter)
+        self.value_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.value_lbl.setWordWrap(True)
         self.value_lbl.setStyleSheet("font-size: 22px; font-weight: bold; padding: 14px;")
         layout.addWidget(self.value_lbl, stretch=1)
@@ -140,7 +139,7 @@ class HumanSensingPanel(QWidget):
             "Métricas derivadas do RSSI medido, com filtro Kalman+Hampel e fusão "
             "multi-AP. (Posição, batimento, gestos e contagem exata exigiriam CSI.)"
         )
-        legend.setTextFormat(Qt.RichText)
+        legend.setTextFormat(Qt.TextFormat.RichText)
         legend.setWordWrap(True)
         bar.addWidget(legend, 1)
         self.btn_calibrate = QPushButton("🎯 Calibrar ambiente vazio")

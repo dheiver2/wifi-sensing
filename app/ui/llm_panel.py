@@ -13,8 +13,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.ai.bitnet import BitNetClient
-from app.ai.bitnet import SYSTEM_PROMPT
+from app.ai.bitnet import SYSTEM_PROMPT, BitNetClient
 from app.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -36,7 +35,7 @@ class _LLMWorker(QObject):
         try:
             text = self._client.generate(self._prompt, system=SYSTEM_PROMPT)
             self.done.emit(text or "(resposta vazia)")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.exception("Falha na geração do LLM.")
             self.failed.emit(str(exc))
 
@@ -87,7 +86,7 @@ class LLMPanel(QWidget):
             return
         try:
             models = self._client.list_models()
-        except Exception:  # noqa: BLE001
+        except Exception:
             models = []
         self.combo_model.clear()
         self.combo_model.addItems(models or [self._client.model])

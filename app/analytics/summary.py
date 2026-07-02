@@ -7,7 +7,7 @@ como prompt para o modelo de linguagem interpretar.
 from __future__ import annotations
 
 from collections import Counter
-from typing import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 
 import numpy as np
 

@@ -11,7 +11,7 @@ import platform
 import random
 import re
 import subprocess
-from typing import List
+from typing import ClassVar
 
 from app.utils.logging_config import get_logger
 from app.wifi.models import WifiSample
@@ -41,7 +41,7 @@ class WifiScanner(abc.ABC):
     """Interface base para implementações de scanner Wi-Fi."""
 
     @abc.abstractmethod
-    def scan(self) -> List[WifiSample]:
+    def scan(self) -> list[WifiSample]:
         """Executa uma varredura e retorna as amostras detectadas."""
         raise NotImplementedError
 
@@ -51,12 +51,12 @@ class LinuxScanner(WifiScanner):
 
     _FIELDS = "SSID,BSSID,SIGNAL,CHAN,FREQ"
 
-    def scan(self) -> List[WifiSample]:
+    def scan(self) -> list[WifiSample]:
         cmd = [
             "nmcli", "-t", "-f", self._FIELDS, "device", "wifi", "list", "--rescan", "yes",
         ]
         out = subprocess.check_output(cmd, text=True, timeout=30)
-        samples: List[WifiSample] = []
+        samples: list[WifiSample] = []
         for line in out.strip().splitlines():
             # BSSID contém ':' escapados como '\:' no modo terse do nmcli.
             parts = re.split(r"(?<!\\):", line)
@@ -85,12 +85,12 @@ class LinuxScanner(WifiScanner):
 class WindowsScanner(WifiScanner):
     """Scanner baseado em ``netsh wlan show networks mode=bssid``."""
 
-    def scan(self) -> List[WifiSample]:
+    def scan(self) -> list[WifiSample]:
         out = subprocess.check_output(
             ["netsh", "wlan", "show", "networks", "mode=bssid"],
             text=True, timeout=30, errors="ignore",
         )
-        samples: List[WifiSample] = []
+        samples: list[WifiSample] = []
         ssid = ""
         bssid = ""
         rssi = 0
@@ -131,19 +131,20 @@ class MacScanner(WifiScanner):
     Empacotando como ``.app`` com Localização autorizada, os nomes aparecem.
     """
 
-    _WIDTH = {0: None, 1: 20.0, 2: 40.0, 3: 80.0, 4: 160.0}
-    _BAND = {0: None, 1: "2.4 GHz", 2: "5 GHz", 3: "6 GHz"}
+    _WIDTH: ClassVar[dict[int, float | None]] = {0: None, 1: 20.0, 2: 40.0, 3: 80.0, 4: 160.0}
+    _BAND: ClassVar[dict[int, str | None]] = {0: None, 1: "2.4 GHz", 2: "5 GHz", 3: "6 GHz"}
 
     def __init__(self, refresh_interval_s: float = 20.0) -> None:
-        import CoreWLAN  # import tardio: só é necessário no macOS
         import threading
+
+        import CoreWLAN  # import tardio: só é necessário no macOS
 
         self._client = CoreWLAN.CWWiFiClient.sharedWiFiClient()
         self._iface = self._client.interface()
         if self._iface is None:
             raise RuntimeError("Nenhuma interface Wi-Fi encontrada (CoreWLAN).")
         self._warned_redacted = False
-        self._last_samples: List[WifiSample] = []
+        self._last_samples: list[WifiSample] = []
         self._refresh_interval = refresh_interval_s
 
         # Um scan ativo completo leva ~15-25s no macOS. Para um dashboard
@@ -179,7 +180,7 @@ class MacScanner(WifiScanner):
             logger.debug("Scan ativo falhou: %s", error)
             return
 
-    def scan(self) -> List[WifiSample]:
+    def scan(self) -> list[WifiSample]:
         """Retorna as redes do cache do sistema (rápido, dados reais)."""
         networks = self._iface.cachedScanResults()
         if not networks:
@@ -218,7 +219,7 @@ class MacScanner(WifiScanner):
         for r in raw:
             groups[(r["band"], r["channel"], r["width"])].append(r)
 
-        samples: List[WifiSample] = []
+        samples: list[WifiSample] = []
         for (band, channel, width), items in groups.items():
             items.sort(key=lambda x: x["rssi"], reverse=True)
             for rank, r in enumerate(items):
@@ -251,7 +252,7 @@ class SimulatedScanner(WifiScanner):
     se deseja reproduzir cenários de interferência de forma controlada.
     """
 
-    _NETWORKS = [
+    _NETWORKS: ClassVar[list[tuple[str, str, int, float]]] = [
         ("LabNet-2G", "aa:bb:cc:00:00:01", 6, 2437.0),
         ("LabNet-5G", "aa:bb:cc:00:00:02", 36, 5180.0),
         ("Vizinho-2G", "dd:ee:ff:00:00:03", 11, 2462.0),
@@ -261,9 +262,9 @@ class SimulatedScanner(WifiScanner):
     def __init__(self) -> None:
         self._t = 0
 
-    def scan(self) -> List[WifiSample]:
+    def scan(self) -> list[WifiSample]:
         self._t += 1
-        samples: List[WifiSample] = []
+        samples: list[WifiSample] = []
         for ssid, bssid, channel, freq in self._NETWORKS:
             base = -55 if freq < 3000 else -65
             # Variação senoidal + ruído gaussiano simulando o ambiente.

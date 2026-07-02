@@ -1,0 +1,6 @@
+# Dependências de desenvolvimento, testes e qualidade de código
+pytest>=8.0
+pytest-cov>=5.0
+ruff>=0.6
+mypy>=1.11
+pre-commit>=3.8

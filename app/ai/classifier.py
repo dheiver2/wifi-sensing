@@ -6,8 +6,8 @@ Suporta aprendizado supervisionado (RandomForest) e não supervisionado
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 import joblib
 import numpy as np
@@ -116,7 +116,7 @@ class EnvironmentClassifier:
         logger.info("Modelo salvo em %s", path)
 
     @classmethod
-    def load(cls, path: Path) -> "EnvironmentClassifier":
+    def load(cls, path: Path) -> EnvironmentClassifier:
         """Carrega um modelo previamente salvo."""
         data = joblib.load(path)
         obj = cls(mode=data["mode"], n_clusters=data.get("n_clusters", 3))

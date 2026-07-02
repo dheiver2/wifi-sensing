@@ -13,8 +13,8 @@ hardware — ver classe :class:`CSIBackend` como ponto de extensão futuro.
 from __future__ import annotations
 
 from collections import Counter, deque
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Deque, Sequence
 
 import numpy as np
 
@@ -61,8 +61,8 @@ class HumanSensingEngine:
         """
         self.sample_rate_hz = sample_rate_hz
         self._window = max(window, 32)
-        self._buffer: Deque[float] = deque(maxlen=self._window)
-        self._ap_hist: dict[str, Deque[float]] = {}
+        self._buffer: deque[float] = deque(maxlen=self._window)
+        self._ap_hist: dict[str, deque[float]] = {}
         self._motion_threshold = 1.5  # dBm de desvio ~ movimento perceptível
         # Calibração de ambiente vazio (limiares adaptativos).
         self._calibrated = False
@@ -206,18 +206,27 @@ class HumanSensingEngine:
         if M is None:
             return 0.0, 0.0
         Xc = M - M.mean(axis=1, keepdims=True)   # centra cada link no tempo
-        # Covariância entre links (linhas = links = variáveis; colunas = tempo).
-        cov = np.cov(Xc)
-        if np.ndim(cov) < 2 or cov.shape[0] < 2:
+        # Direção principal a partir da CORRELAÇÃO (links padronizados), de modo
+        # que a 1ª componente capture a flutuação *correlacionada* entre enlaces
+        # e não seja dominada pelo AP de maior variância absoluta.
+        s = Xc.std(axis=1, keepdims=True)
+        active = (s.ravel() > 1e-6)
+        if active.sum() < 2:
             return 0.0, 0.0
-        vals, vecs = np.linalg.eigh(cov)
-        top = float(max(vals[-1], 0.0))
-        amplitude = float(np.sqrt(top))
-        # Coerência = espalhamento da 1ª componente entre links (participation
-        # ratio normalizado): ~1 se muitos APs contribuem (evento físico global),
-        # ~0 se a variação vem de um único AP (ruído local) — robustez multi-link.
-        w = vecs[:, -1] ** 2
-        pr = 1.0 / float(np.sum(w ** 2) + 1e-12)   # 1..n_links
+        Xs = Xc[active] / s[active]
+        corr = np.cov(Xs)
+        if np.ndim(corr) < 2 or corr.shape[0] < 2:
+            return 0.0, 0.0
+        _, vecs = np.linalg.eigh(corr)
+        w = vecs[:, -1]                            # direção correlacionada (unitária)
+        # Amplitude (dBm): desvio da série projetada na direção dominante, sobre
+        # os dados ORIGINAIS centrados — preserva a escala física do movimento.
+        proj = w @ Xc[active]
+        amplitude = float(np.std(proj))
+        # Coerência = participation ratio normalizado do autovetor: ~1 se muitos
+        # APs contribuem (evento físico global), ~0 se vem de um único enlace.
+        w2 = w ** 2
+        pr = 1.0 / float(np.sum(w2 ** 2) + 1e-12)   # 1..n_links_ativos
         n = len(w)
         coherence = (pr - 1.0) / (n - 1.0) if n > 1 else 0.0
         return amplitude, float(np.clip(coherence, 0.0, 1.0))
@@ -255,17 +264,36 @@ class HumanSensingEngine:
         """Detecta periodicidade dominante na série de RSSI (FFT)."""
         if arr.size < 16:
             return 0.0, False
-        detr = arr - np.mean(arr)
-        freqs = np.fft.rfftfreq(detr.size, d=1.0 / self.sample_rate_hz)
+        n = arr.size
+        # Detrend LINEAR (remove deriva lenta do ambiente) + janela de Hann
+        # (reduz vazamento). Sem isso, uma rampa monotônica simula "ritmo".
+        x = np.arange(n)
+        coef = np.polyfit(x, arr, 1)
+        residual = arr - np.polyval(coef, x)
+        # Piso de amplitude: sem oscilação real (apenas ruído numérico), o teste
+        # de prominência sempre encontra "algum" pico. Exige RMS mínimo em dBm.
+        if float(np.sqrt(np.mean(residual ** 2))) < 0.5:
+            return 0.0, False
+        detr = residual * np.hanning(n)
+        freqs = np.fft.rfftfreq(n, d=1.0 / self.sample_rate_hz)
         mags = np.abs(np.fft.rfft(detr))
-        if mags.size <= 1:
+        if mags.size <= 2:
             return 0.0, False
         mags[0] = 0.0  # remove componente DC
-        idx = int(np.argmax(mags))
-        peak, mean_mag = mags[idx], float(np.mean(mags[1:]) + 1e-9)
+        # Exige pelo menos ~2 ciclos completos na janela: descarta tendências
+        # lentas (deriva do ambiente) que mascaram-se de "ritmo".
+        min_freq = 2.0 / (n / self.sample_rate_hz)
+        valid = freqs >= min_freq
+        if not np.any(valid):
+            return 0.0, False
+        cand = np.where(valid, mags, 0.0)
+        idx = int(np.argmax(cand))
+        peak = float(cand[idx])
+        # Prominência relativa ao ruído de fundo (mediana é robusta a outros picos).
+        noise = float(np.median(mags[1:]) + 1e-9)
         if freqs[idx] <= 0:
             return 0.0, False
-        has_rhythm = peak > 3.0 * mean_mag  # pico destacado do ruído
+        has_rhythm = peak > 4.0 * noise  # pico bem destacado do ruído
         return float(1.0 / freqs[idx]), has_rhythm
 
     def _change_probability(self, arr: np.ndarray) -> float:
@@ -274,9 +302,9 @@ class HumanSensingEngine:
             return 0.0
         recent = arr[-10:]
         baseline = arr[:-10]
-        base_mean = float(np.mean(baseline))
-        base_std = float(np.std(baseline)) + 1e-6
-        z = abs(float(np.mean(recent)) - base_mean) / base_std
+        base_med = float(np.median(baseline))
+        base_scale = 1.4826 * float(np.median(np.abs(baseline - base_med))) + 1e-6
+        z = abs(float(np.median(recent)) - base_med) / base_scale
         return float(1.0 / (1.0 + np.exp(-(z - 2.0))))
 
 

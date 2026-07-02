@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import csv
+from collections.abc import Iterable, Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable, Sequence
 
-import pandas as pd
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -76,23 +75,20 @@ class MeasurementRepository:
         with self._Session() as session:
             return list(session.scalars(stmt))
 
-    def to_dataframe(self, bssid: str | None = None) -> pd.DataFrame:
-        """Carrega medições em um :class:`pandas.DataFrame`."""
-        rows = self.fetch_series(bssid=bssid)
-        return pd.DataFrame(
-            [
-                {
-                    "timestamp": r.timestamp,
-                    "ssid": r.ssid,
-                    "bssid": r.bssid,
-                    "rssi": r.rssi,
-                    "channel": r.channel,
-                    "frequency_mhz": r.frequency_mhz,
-                    "bandwidth_mhz": r.bandwidth_mhz,
-                }
-                for r in rows
-            ]
-        )
+    def to_records(self, bssid: str | None = None) -> list[dict]:
+        """Carrega medições como lista de dicionários (timestamp em ISO 8601)."""
+        return [
+            {
+                "timestamp": r.timestamp.isoformat() if r.timestamp else "",
+                "ssid": r.ssid,
+                "bssid": r.bssid,
+                "rssi": r.rssi,
+                "channel": r.channel,
+                "frequency_mhz": r.frequency_mhz,
+                "bandwidth_mhz": r.bandwidth_mhz,
+            }
+            for r in self.fetch_series(bssid=bssid)
+        ]
 
     def export_csv(self, path: Path, samples: Sequence[WifiSample] | None = None) -> int:
         """Exporta medições para CSV.
@@ -108,12 +104,7 @@ class MeasurementRepository:
             "timestamp", "ssid", "bssid", "rssi",
             "channel", "frequency_mhz", "bandwidth_mhz",
         ]
-        if samples is not None:
-            records = [s.to_dict() for s in samples]
-        else:
-            records = self.to_dataframe().assign(
-                timestamp=lambda d: d["timestamp"].astype(str)
-            ).to_dict(orient="records")
+        records = [s.to_dict() for s in samples] if samples is not None else self.to_records()
 
         with path.open("w", newline="", encoding="utf-8") as fh:
             writer = csv.DictWriter(fh, fieldnames=fields)
