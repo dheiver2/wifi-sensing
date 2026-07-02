@@ -1,26 +1,18 @@
 # Interface gráfica
-PySide6>=6.6
+PySide6~=6.11
+pyqtgraph~=0.14
 
-# Computação numérica e dados
-numpy>=1.26
-pandas>=2.1
-scipy>=1.11
-
-# Banco de dados
-SQLAlchemy>=2.0
+# Computação numérica e processamento de sinais
+numpy~=2.4
+scipy~=1.17
 
 # Machine Learning
-scikit-learn>=1.4
-joblib>=1.3
+scikit-learn~=1.9
+joblib~=1.5
 
-# Deep Learning (opcional - escolha um)
-# tensorflow>=2.16
-torch>=2.2
-
-# Visualização
-matplotlib>=3.8
-pyqtgraph>=0.13
+# Banco de dados
+SQLAlchemy~=2.0
 
 # Aquisição Wi-Fi nativa no macOS (CoreWLAN). Em Linux/Windows é ignorado.
-pyobjc-framework-CoreWLAN>=10.0 ; sys_platform == "darwin"
-pyobjc-framework-CoreLocation>=10.0 ; sys_platform == "darwin"
+pyobjc-framework-CoreWLAN~=12.2 ; sys_platform == "darwin"
+pyobjc-framework-CoreLocation~=12.2 ; sys_platform == "darwin"

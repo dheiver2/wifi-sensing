@@ -1,5 +1,9 @@
 # WiFi Sensing — Análise de Sinais Wi-Fi
 
+[![CI](https://github.com/dheiver2/wifi-sensing/actions/workflows/ci.yml/badge.svg)](https://github.com/dheiver2/wifi-sensing/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
+
 🌐 **Página de apresentação:** https://dheiver2.github.io/wifi-sensing/
 
 Aplicação desktop em Python para **pesquisa e experimentação em sensoriamento
@@ -14,7 +18,7 @@ padrões de interferência e **detectar alterações no ambiente físico**
 ## Funcionalidades
 
 - **Dashboard em tempo real** (PySide6) com tabela de redes e gráficos dinâmicos de RSSI.
-- **Aquisição multiplataforma** (Linux `nmcli`, Windows `netsh`, macOS `airport`) com fallback simulado.
+- **Aquisição multiplataforma** (Linux `nmcli`, Windows `netsh`, macOS CoreWLAN) com fallback simulado.
 - Coleta de **SSID, BSSID, RSSI, canal, frequência, largura de banda e timestamp**.
 - **Persistência** em SQLite (via SQLAlchemy) e exportação **CSV**.
 - **Processamento de sinais**: média móvel, filtragem de ruído (Savitzky-Golay), FFT, estatísticas e extração de características.
@@ -38,14 +42,27 @@ app/
 
 ## Instalação
 
-Requer **Python 3.12+**.
+Requer **Python 3.11+** (testado em CI nas versões 3.11 e 3.12, em Linux,
+macOS e Windows).
 
 ```bash
+git clone https://github.com/dheiver2/wifi-sensing.git
 cd wifi-sensing
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
+
+Para desenvolver (testes, lint, type-check, pre-commit), veja o
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
+### Pré-requisitos por sistema operacional
+
+| SO | Requisito | Observação |
+|---|---|---|
+| Linux | NetworkManager (`nmcli`) instalado e ativo | maioria das distros já traz por padrão |
+| Windows | Nenhum extra | usa `netsh wlan`, já incluso no Windows |
+| macOS | Nenhum extra para RSSI/canal | nomes de rede (SSID/BSSID) exigem empacotar como `.app`, veja abaixo |
 
 ## Uso
 
@@ -96,6 +113,24 @@ fluido.
 
 > Para começar com um banco limpo (sem dados de testes anteriores), apague a
 > pasta `data/`.
+
+## Privacidade e dados coletados
+
+Todos os dados capturados (SSID, BSSID, RSSI, canal, frequência, timestamp)
+são gravados **apenas localmente** no SQLite em `data/wifi_sensing.db` — o
+projeto **não envia nada para nenhum servidor remoto**. A aba de interpretação
+por LLM também roda 100% offline (BitNet local, sem chamadas de rede).
+`data/` já está no `.gitignore`, então esses dados nunca são versionados.
+
+## Solução de problemas
+
+| Sintoma | Causa provável | Solução |
+|---|---|---|
+| `FileNotFoundError: nmcli` (Linux) | NetworkManager não instalado/ativo | `sudo apt install network-manager` e garanta que o serviço está rodando |
+| Nomes de rede aparecem como `<oculto>`/sintéticos no macOS | Sem permissão de Localização (CLI não recebe TCC) | Empacote como `.app` (`python setup.py py2app -A`) e autorize Localização na primeira execução |
+| Dashboard sem nenhuma rede | Wi-Fi desligado ou sem redes próximas | Use `--simulate` para validar a interface com dados sintéticos |
+| Erro ao carregar a aba de IA (BitNet) | Binário/modelo do bitnet.cpp não compilados/baixados | Siga a seção [LLM local nativo](#llm-local-nativo--bitnet-b158-2b4t) |
+| `pip install` falha em `pyobjc-framework-CoreWLAN` fora do macOS | Pacote é exclusivo do macOS | Ignore — o marcador `sys_platform == "darwin"` já evita a instalação em Linux/Windows |
 
 ## LLM local nativo — BitNet b1.58 2B4T
 
@@ -178,6 +213,13 @@ Referências:
 Código orientado a objetos, type hints, docstrings, logging estruturado,
 tratamento de exceções, separação modular e fallback resiliente de aquisição.
 
+## Contribuindo
+
+Contribuições são bem-vindas! Veja o [CONTRIBUTING.md](CONTRIBUTING.md) para
+configurar o ambiente de desenvolvimento e o [Código de Conduta](CODE_OF_CONDUCT.md).
+Mudanças notáveis ficam registradas no [CHANGELOG.md](CHANGELOG.md).
+
 ## Licença
 
-Uso acadêmico/educacional.
+Distribuído sob a licença [MIT](LICENSE). Uso livre, inclusive acadêmico e
+comercial — respeitando o aviso de uso ético no topo deste documento.

@@ -1,0 +1,41 @@
+name: Relato de bug
+description: Reporte um comportamento incorreto ou inesperado.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: descricao
+    attributes:
+      label: Descrição do bug
+      description: O que aconteceu? O que você esperava que acontecesse?
+    validations:
+      required: true
+  - type: textarea
+    id: reproducao
+    attributes:
+      label: Passos para reproduzir
+      description: Comandos executados, flags usadas (`--simulate`, `--debug`, etc).
+      placeholder: |
+        1. python -m app.main --debug
+        2. ...
+    validations:
+      required: true
+  - type: input
+    id: so
+    attributes:
+      label: Sistema operacional e versão
+      placeholder: "macOS 15.1 / Ubuntu 24.04 / Windows 11"
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Versão do Python
+      placeholder: "3.11.9"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs relevantes
+      description: Trecho de `data/logs/wifi_sensing.log` (remova qualquer SSID/BSSID sensível).
+      render: shell

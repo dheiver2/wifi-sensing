@@ -23,3 +23,12 @@ data/
 # BitNet (bitnet.cpp): código de terceiros, binários e modelo (~1,1 GB)
 bitnet/
 *.gguf
+
+# Testes / cobertura
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
